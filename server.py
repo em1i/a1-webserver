@@ -50,52 +50,53 @@ class MyWebServer(socketserver.BaseRequestHandler):
         rMethod = rLine[0]
         rPath = rLine[1]
 
-        # Only accept GET method in this assignment
-        if rMethod == "GET":
+        if "favicon" not in rPath: 
+            # Only accept GET method in this assignment
+            if rMethod == "GET":
 
-            fullPath = self.getFullPath(rPath)
-            pathResult = self.pathExist(fullPath)
-            mimeType = self.getMimeType(rPath)
+                fullPath = self.getFullPath(rPath)
+                pathResult = self.pathExist(fullPath)
+                mimeType = self.getMimeType(rPath)
 
-            if pathResult == "isDirectory":
-                # Does not end with "/", return status code "301 Moved Permanently"
-                # Otherwise return status code "200 OK"
-                if self.validDirectory(rPath):
-                    self.handleHTML(fullPath + "index.html")
+                if pathResult == "isDirectory":
+                    # Does not end with "/", return status code "301 Moved Permanently"
+                    # Otherwise return status code "200 OK"
+                    if self.validDirectory(rPath):
+                        self.handleHTML(fullPath + "index.html")
+                        self.request.sendall(bytearray(self.headerResponse(200),'utf-8'))
+                    else:
+                        self.statusCode301(rPath + "/")
+                        self.request.sendall(bytearray(self.headerResponse(301),'utf-8'))
+
+                elif pathResult =="isFile":
+                    # .css
+                    if mimeType == "css":
+                        self.handleCSS(fullPath)
+
+                    # .html
+                    elif mimeType == "html":
+                        self.handleHTML(fullPath)
+                    
+                    else:
+                        print("invalid mime-type")
+                    
                     self.request.sendall(bytearray(self.headerResponse(200),'utf-8'))
+
+                # Path not found, return return status code "404 Not Found"
                 else:
-                    self.statusCode301(rPath + "/")
-                    self.request.sendall(bytearray(self.headerResponse(301),'utf-8'))
+                    # End with "/"
+                    if self.validDirectory(rPath):
+                        self.statusCode404()
+                        self.request.sendall(bytearray(self.headerResponse(404),'utf-8'))
+                    else:
+                        self.statusCode301(rPath + "/")
+                        self.request.sendall(bytearray(self.headerResponse(301),'utf-8'))
+                    
 
-            elif pathResult =="isFile":
-                # .css
-                if mimeType == "css":
-                    self.handleCSS(fullPath)
-
-                # .html
-                elif mimeType == "html":
-                    self.handleHTML(fullPath)
-                
-                else:
-                    print("invalid mime-type")
-                
-                self.request.sendall(bytearray(self.headerResponse(200),'utf-8'))
-
-            # Path not found, return return status code "404 Not Found"
+            # status code "405 Method not allowed" for all non GET method
             else:
-                # End with "/"
-                if self.validDirectory(rPath):
-                    self.statusCode404()
-                    self.request.sendall(bytearray(self.headerResponse(404),'utf-8'))
-                else:
-                    self.statusCode301(rPath + "/")
-                    self.request.sendall(bytearray(self.headerResponse(301),'utf-8'))
-                
-
-        # status code "405 Method not allowed" for all non GET method
-        else:
-            self.statusCode405()
-            self.request.sendall(bytearray(self.headerResponse(405),'utf-8'))
+                self.statusCode405()
+                self.request.sendall(bytearray(self.headerResponse(405),'utf-8'))
 
         # self.request.sendall(bytearray("OK",'utf-8'))
       
