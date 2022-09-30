@@ -43,13 +43,10 @@ class MyWebServer(socketserver.BaseRequestHandler):
         }
 
         self.data = self.request.recv(1024).strip()
-        print("`````````` START `````````")
         print ("Got a request of: %s\n" % self.data)
 
         dataList = self.data.decode("utf-8").splitlines()
-        print("@@@ dataList: ", dataList)
         rLine = dataList[0].split()
-        print("@@@ rLine is: ", rLine)
         rMethod = rLine[0]
         rPath = rLine[1]
 
@@ -60,80 +57,101 @@ class MyWebServer(socketserver.BaseRequestHandler):
             pathResult = self.pathExist(fullPath)
             mimeType = self.getMimeType(rPath)
 
-            print("******* mime-type: " + mimeType)
-
             if pathResult == "isDirectory":
-
                 # Does not end with "/", return status code "301 Moved Permanently"
                 # Otherwise return status code "200 OK"
                 if self.validDirectory(rPath):
                     self.handleHTML(fullPath + "index.html")
+                    self.request.sendall(bytearray(self.headerResponse(200),'utf-8'))
                 else:
                     self.statusCode301(rPath + "/")
+                    self.request.sendall(bytearray(self.headerResponse(301),'utf-8'))
 
             elif pathResult =="isFile":
-                # .css??
+                # .css
                 if mimeType == "css":
                     self.handleCSS(fullPath)
 
-                # .html?
+                # .html
                 elif mimeType == "html":
                     self.handleHTML(fullPath)
                 
                 else:
                     print("invalid mime-type")
+                
+                self.request.sendall(bytearray(self.headerResponse(200),'utf-8'))
 
             # Path not found, return return status code "404 Not Found"
             else:
-                self.statusCode404()
+                # End with "/"
+                if self.validDirectory(rPath):
+                    self.statusCode404()
+                    self.request.sendall(bytearray(self.headerResponse(404),'utf-8'))
+                else:
+                    self.statusCode301(rPath + "/")
+                    self.request.sendall(bytearray(self.headerResponse(301),'utf-8'))
+                
 
         # status code "405 Method not allowed" for all non GET method
         else:
             self.statusCode405()
+            self.request.sendall(bytearray(self.headerResponse(405),'utf-8'))
 
         # self.request.sendall(bytearray("OK",'utf-8'))
-
-        
-        print(self.headerResponse())
-        self.request.sendall(bytearray(self.headerResponse(),'utf-8'))
-        print("`````````` END `````````")
-        
-
-    def statusCode200(self):
-        self.headerDetails["statusCode"] = "200 OK"
-        self.headerDetails["contentType"] = "text/html"
+      
 
     # Handle status code 301 #
     # HTTP/1.1 301 Moved Permanently
-    # Go to the URI mentioned in the Location header, and don't ask me again!
+    # Go to the URI mentioned in the Location header
     # URI in the location bar automatically changes
-    def statusCode301(self, location):
+    def statusCode301(self, loc):
         self.headerDetails["statusCode"] = "301 Moved Permanently"
-        self.headerDetails["location"]  = location 
-        # self.headerDetails["contentLength"] = len(self.headerDetails["contentMessage"])
+        self.headerDetails["location"]  = loc
 
     # Handle status code 404 #
     # HTTP/1.1 404 Not Found
-    # You've got the wrong resource or path. Can't find what you're looking for. Droids? What droids? 
+    # Path does not exist
     def statusCode404(self):
         self.headerDetails["statusCode"] = "404 Not Found"
-        # self.headerDetails["contentLength"] = len(self.headerDetails["contentMessage"])
 
     # Handle status code 405 #
     # HTTP/1.1 405 Method not allowed
-    # Whatever method you used (GET/HEAD/POST/PUT/DELETE/...) doesn't work on this URI
+    # Only accepting GET for this assignment
     def statusCode405(self):
         self.headerDetails["statusCode"] = "405 Method not allowed"
-        # self.headerDetails["contentLength"] = len(self.headerDetails["contentMessage"])
+
+
+    # status code 200
+    def statusCode200(self, fullPath):
+        content = self.getFileContent(fullPath)
+        self.headerDetails["statusCode"] = "200 OK"
+        self.headerDetails["contentLength"] = len(content)
+        self.headerDetails["contentMessage"] = content
+
+
+    # open css file and read the content
+    def handleCSS(self, fullPath):
+        self.statusCode200(fullPath)
+        self.headerDetails["contentType"] = "text/css"
+
+
+    # open html file and read the content
+    def handleHTML(self, fullPath):
+        self.statusCode200(fullPath)
+        self.headerDetails["contentType"] = "text/html"
+
 
     # construct header response
-
-    def headerResponse(self): 
-        response = """HTTP/1.1 {0}\r\nContent-Length: {1}\r\nContent-Type: {2}\r\n\r\n{3}""".format(self.headerDetails["statusCode"], self.headerDetails["contentLength"], self.headerDetails["contentType"], self.headerDetails["contentMessage"])
-       
-        # response = """HTTP/1.1 {0}\r\nLocation: {1}\r\n""".format(self.headerDetails["statusCode"], self.headerDetails["location"])
+    def headerResponse(self, code): 
+        response = ""
+        if code == 200:
+            response = "HTTP/1.1 {0}\r\nContent-Length: {1}\r\nContent-Type: {2}\r\n\r\n{3}".format(self.headerDetails["statusCode"], self.headerDetails["contentLength"], self.headerDetails["contentType"], self.headerDetails["contentMessage"])
+        
+        elif code == 301:
+            response = "HTTP/1.1 {0}\r\nLocation: {1}\r\n".format(self.headerDetails["statusCode"], self.headerDetails["location"])
+        else:
+            response = "HTTP/1.1 {0}\r\n\r\n{1}".format(self.headerDetails["statusCode"], self.headerDetails["statusCode"])
         return response
-
 
 
     # Check if path exist, is it directory or file
@@ -159,6 +177,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
         else:
             return False
 
+
     # Get mime-types, accepts http and css for this assignment
     def getMimeType(self, rPath):
         if ".css" in rPath:
@@ -168,25 +187,6 @@ class MyWebServer(socketserver.BaseRequestHandler):
         else:
             return "invalid"
 
-    # open css file and read the content
-    def handleCSS(self, fullPath):
-        print("******* in handleCSS")
-        content = self.getFileContent(fullPath)
-        self.headerDetails["statusCode"] = "200 OK"
-        self.headerDetails["contentType"] = "text/css"
-        self.headerDetails["contentLength"] = len(content)
-        self.headerDetails["contentMessage"] = content
-
-
-    # open html file and read the content
-    def handleHTML(self, fullPath):
-        print("******* in handleHTML")
-        content = self.getFileContent(fullPath)
-        self.headerDetails["statusCode"] = "200 OK"
-        self.headerDetails["contentType"] = "text/html"
-        self.headerDetails["contentLength"] = len(content)
-        self.headerDetails["contentMessage"] = content
-        return
 
     # Read file content
     def getFileContent(self, fullPath):
@@ -196,7 +196,6 @@ class MyWebServer(socketserver.BaseRequestHandler):
                 return content
         except IOError:
             return "Can not read file."
-
 
 
 if __name__ == "__main__":
