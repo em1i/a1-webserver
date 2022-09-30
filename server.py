@@ -35,11 +35,11 @@ class MyWebServer(socketserver.BaseRequestHandler):
 
         # Dictionary to store header response messages
         self.headerDetails = {
-            "statusCode": "test code",
+            "statusCode": "",
             "contentLength" : 0,
-            "contentType": "test message",
-            "contentMessage": "test message",
-            "location": "test location"
+            "contentType": "",
+            "contentMessage": "",
+            "location": ""
         }
 
         self.data = self.request.recv(1024).strip()
@@ -109,7 +109,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
     # URI in the location bar automatically changes
     def statusCode301(self, location):
         self.headerDetails["statusCode"] = "301 Moved Permanently"
-        self.location = location 
+        self.headerDetails["location"]  = location 
         # self.headerDetails["contentLength"] = len(self.headerDetails["contentMessage"])
 
     # Handle status code 404 #
@@ -129,7 +129,9 @@ class MyWebServer(socketserver.BaseRequestHandler):
     # construct header response
 
     def headerResponse(self): 
-        response = """HTTP/1.1 {0}\n\rContent-Length: {1}\n\rContent-Type: {2}\n\r\n\r{3}""".format(self.headerDetails["statusCode"], self.headerDetails["contentLength"], self.headerDetails["contentType"], self.headerDetails["contentMessage"])
+        response = """HTTP/1.1 {0}\r\nContent-Length: {1}\r\nContent-Type: {2}\r\n\r\n{3}""".format(self.headerDetails["statusCode"], self.headerDetails["contentLength"], self.headerDetails["contentType"], self.headerDetails["contentMessage"])
+       
+        # response = """HTTP/1.1 {0}\r\nLocation: {1}\r\n""".format(self.headerDetails["statusCode"], self.headerDetails["location"])
         return response
 
 
