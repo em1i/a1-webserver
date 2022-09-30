@@ -1,6 +1,8 @@
 #  coding: utf-8 
 import socketserver
 
+import os
+
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,9 +32,187 @@ import socketserver
 class MyWebServer(socketserver.BaseRequestHandler):
     
     def handle(self):
+
+        # Dictionary to store header response messages
+        self.headerDetails = {
+            "statusCode": "200 OK",
+            "contentLength" : 0,
+            "contentType": "text/plain",
+            "contentMessage": "test message",
+            "location": "test location"
+        }
+
         self.data = self.request.recv(1024).strip()
         print ("Got a request of: %s\n" % self.data)
-        self.request.sendall(bytearray("OK",'utf-8'))
+
+        dataList = self.data.decode("utf-8").splitlines()
+        rLine = dataList[0].split()
+        rMethod = rLine[0]
+        rPath = rLine[1]
+
+        # test print
+        # currentDir = os.getcwd() + "/www"
+        # print("current directory: ", currentDir)
+        # print("is it a directory? ", os.path.isdir(currentDir + rPath))
+        # print("is it a folder? ", os.path.isfile(currentDir + rPath))
+
+        # Only accept GET method in this assignment
+        if rMethod == "GET":
+
+            fullPath = self.getFullPath(rPath)
+            pathResult = self.pathExist(fullPath)
+            mimeType = self.getMimeType(rPath)
+
+            if pathResult == "isDirectory":
+
+                # Does not end with "/", return status code "301 Moved Permanently"
+                # Otherwise return status code "200 OK"
+                if self.validDirectory(rPath):
+                    print()
+                else:
+                    self.statusCode301(rPath + "/")
+
+            elif pathResult =="isFile":
+                # .css??
+                if mimeType == "css":
+                    self.handleCSS(fullPath)
+
+                # .html?
+                elif mimeType == "html":
+                    self.handleHTML(fullPath)
+                
+                else:
+                    print("invalid mime-type")
+
+            # Path not found, return return status code "404 Not Found"
+            else:
+                self.statusCode404()
+
+        # status code "405 Method not allowed" for all non GET method
+        else:
+            self.statusCode405()
+
+
+        # # test print
+        # # print("\n===================")
+        # # for l in dataList:
+        # #     print (l)
+
+        # print(dataList[0])
+        # gline = dataList[0].split()
+        # for x in gline:
+        #     print(x)
+        # print("/////////////////////\n")
+
+        # self.request.sendall(bytearray("OK",'utf-8'))
+
+        self.request.sendall(bytearray(self.headerResponse(),'utf-8'))
+
+
+    # Handle status code 301 #
+    # HTTP/1.1 301 Moved Permanently
+    # Go to the URI mentioned in the Location header, and don't ask me again!
+    # URI in the location bar automatically changes
+    def statusCode301(self, location):
+        self.headerDetails["statusCode"] = "301 Moved Permanently"
+        self.location = location 
+        # self.headerDetails["contentLength"] = len(self.headerDetails["contentMessage"])
+
+    # Handle status code 404 #
+    # HTTP/1.1 404 Not Found
+    # You've got the wrong resource or path. Can't find what you're looking for. Droids? What droids? 
+    def statusCode404(self):
+        self.headerDetails["statusCode"] = "404 Not Found"
+        # self.headerDetails["contentLength"] = len(self.headerDetails["contentMessage"])
+
+    # Handle status code 405 #
+    # HTTP/1.1 405 Method not allowed
+    # Whatever method you used (GET/HEAD/POST/PUT/DELETE/...) doesn't work on this URI
+    def statusCode405(self):
+        self.headerDetails["statusCode"] = "405 Method not allowed"
+        # self.headerDetails["contentLength"] = len(self.headerDetails["contentMessage"])
+
+    # construct header response
+    '''
+    sample response
+    HTTP/1.1 200 OK
+    Date: Mon, 27 Jul 2009 12:28:53 GMT
+    Server: Apache/2.2.14 (Win32)
+    Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT
+    Content-Length: 88
+    Content-Type: text/html
+    Connection: Closed
+    '''
+    def headerResponse(self): 
+        response = """HTTP/1.1 {0}
+        Content-Length: {1}
+        Content-Type: {2}
+        {3}
+        """.format(self.headerDetails["statusCode"], self.headerDetails["contentLength"], self.headerDetails["contentType"], self.headerDetails["contentMessage"])
+        return response
+
+
+
+    # Check if path exist, is it directory or file
+    def pathExist(self, fullPath):
+        # Is it a directory (folder)? 
+        if os.path.isdir(fullPath):
+            return "isDirectory"
+        elif os.path.isfile(fullPath):
+            return "isFile"
+        else:
+            return "pathDoesNotExist"
+
+
+    # Get the full path wth given path parameter
+    def getFullPath(self, rPath):
+        return os.getcwd() + "/www" + rPath
+
+    # Check if for valid directory. Must end in "/"
+    def validDirectory(self, rPath):
+        lastCharIndex = len(rPath)-1
+        if rPath[lastCharIndex] == "/":
+            return True
+        else:
+            return False
+
+    # Get mime-types, accepts http and css for this assignment
+    def getMimeType(self, rPath):
+        if ".css" in rPath:
+            return "css"
+        elif ".html" in rPath:
+            return "html"
+        else:
+            return "invalid"
+
+    # open css file and read the content
+    def handleCSS(self, fullPath):
+        content = self.getFileContent(fullPath)
+        self.headerDetails["statusCode"] = "200 OK"
+        self.headerDetails["contentType"] = "text/css"
+        self.headerDetails["contentLength"] = len(content)
+        self.headerDetails["contentMessage"] = content
+
+
+    # open html file and read the content
+    def handleHTML(self, fullPath):
+        content = self.getFileContent(fullPath)
+        self.headerDetails["statusCode"] = "200 OK"
+        self.headerDetails["contentType"] = "text/html"
+        self.headerDetails["contentLength"] = len(content)
+        self.headerDetails["contentMessage"] = content
+        return
+
+    # Read file content
+    def getFileContent(self, fullPath):
+        try:
+            with open(fullPath) as file:
+                content = file.read()
+                return content
+        except IOError:
+            return "Can not read file."
+
+
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
