@@ -35,26 +35,23 @@ class MyWebServer(socketserver.BaseRequestHandler):
 
         # Dictionary to store header response messages
         self.headerDetails = {
-            "statusCode": "200 OK",
+            "statusCode": "test code",
             "contentLength" : 0,
-            "contentType": "text/plain",
+            "contentType": "test message",
             "contentMessage": "test message",
             "location": "test location"
         }
 
         self.data = self.request.recv(1024).strip()
+        print("`````````` START `````````")
         print ("Got a request of: %s\n" % self.data)
 
         dataList = self.data.decode("utf-8").splitlines()
+        print("@@@ dataList: ", dataList)
         rLine = dataList[0].split()
+        print("@@@ rLine is: ", rLine)
         rMethod = rLine[0]
         rPath = rLine[1]
-
-        # test print
-        # currentDir = os.getcwd() + "/www"
-        # print("current directory: ", currentDir)
-        # print("is it a directory? ", os.path.isdir(currentDir + rPath))
-        # print("is it a folder? ", os.path.isfile(currentDir + rPath))
 
         # Only accept GET method in this assignment
         if rMethod == "GET":
@@ -63,12 +60,14 @@ class MyWebServer(socketserver.BaseRequestHandler):
             pathResult = self.pathExist(fullPath)
             mimeType = self.getMimeType(rPath)
 
+            print("******* mime-type: " + mimeType)
+
             if pathResult == "isDirectory":
 
                 # Does not end with "/", return status code "301 Moved Permanently"
                 # Otherwise return status code "200 OK"
                 if self.validDirectory(rPath):
-                    print()
+                    self.handleHTML(fullPath + "index.html")
                 else:
                     self.statusCode301(rPath + "/")
 
@@ -92,22 +91,17 @@ class MyWebServer(socketserver.BaseRequestHandler):
         else:
             self.statusCode405()
 
-
-        # # test print
-        # # print("\n===================")
-        # # for l in dataList:
-        # #     print (l)
-
-        # print(dataList[0])
-        # gline = dataList[0].split()
-        # for x in gline:
-        #     print(x)
-        # print("/////////////////////\n")
-
         # self.request.sendall(bytearray("OK",'utf-8'))
 
+        
+        print(self.headerResponse())
         self.request.sendall(bytearray(self.headerResponse(),'utf-8'))
+        print("`````````` END `````````")
+        
 
+    def statusCode200(self):
+        self.headerDetails["statusCode"] = "200 OK"
+        self.headerDetails["contentType"] = "text/html"
 
     # Handle status code 301 #
     # HTTP/1.1 301 Moved Permanently
@@ -133,22 +127,9 @@ class MyWebServer(socketserver.BaseRequestHandler):
         # self.headerDetails["contentLength"] = len(self.headerDetails["contentMessage"])
 
     # construct header response
-    '''
-    sample response
-    HTTP/1.1 200 OK
-    Date: Mon, 27 Jul 2009 12:28:53 GMT
-    Server: Apache/2.2.14 (Win32)
-    Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT
-    Content-Length: 88
-    Content-Type: text/html
-    Connection: Closed
-    '''
+
     def headerResponse(self): 
-        response = """HTTP/1.1 {0}
-        Content-Length: {1}
-        Content-Type: {2}
-        {3}
-        """.format(self.headerDetails["statusCode"], self.headerDetails["contentLength"], self.headerDetails["contentType"], self.headerDetails["contentMessage"])
+        response = """HTTP/1.1 {0}\n\rContent-Length: {1}\n\rContent-Type: {2}\n\r\n\r{3}""".format(self.headerDetails["statusCode"], self.headerDetails["contentLength"], self.headerDetails["contentType"], self.headerDetails["contentMessage"])
         return response
 
 
@@ -187,6 +168,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
 
     # open css file and read the content
     def handleCSS(self, fullPath):
+        print("******* in handleCSS")
         content = self.getFileContent(fullPath)
         self.headerDetails["statusCode"] = "200 OK"
         self.headerDetails["contentType"] = "text/css"
@@ -196,6 +178,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
 
     # open html file and read the content
     def handleHTML(self, fullPath):
+        print("******* in handleHTML")
         content = self.getFileContent(fullPath)
         self.headerDetails["statusCode"] = "200 OK"
         self.headerDetails["contentType"] = "text/html"
