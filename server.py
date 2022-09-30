@@ -151,7 +151,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
         elif code == 301:
             response = "HTTP/1.1 {0}\r\nLocation: {1}\r\n".format(self.headerDetails["statusCode"], self.headerDetails["location"])
         else:
-            response = "HTTP/1.1 {0}\r\n\r\n{1}".format(self.headerDetails["statusCode"], self.headerDetails["statusCode"])
+            response = "HTTP/1.1 {0}\r\nContent-Length: {1}\r\n\r\n{2}".format(self.headerDetails["statusCode"], len(self.headerDetails["statusCode"]), self.headerDetails["statusCode"])
         return response
 
 
